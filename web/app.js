@@ -1218,6 +1218,60 @@ function attachLayoutHandlers() {
     document.getElementById('layout-replay').addEventListener('click', () => {
         if (layoutSim) resetLayoutSim(layoutSim);
     });
+    document.getElementById('production-download').addEventListener('click', downloadProductionCsv);
+}
+
+function downloadProductionCsv() {
+    if (!lastPlan?.success || !lastLayout) return;
+    const members = lastLayout.layout.pieces.flatMap(piece => piece.members);
+    const statusLabels = {
+        producing: 'Producing',
+        idle: 'Idle',
+        nothing_available: 'Nothing available',
+        not_needed: 'Not needed',
+    };
+    const csvCell = value => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const rows = [
+        ['Facility', 'Product', 'Count', 'Output per hour', 'Environment', 'Homeland position', 'Status'].map(translate),
+        ...lastPlan.coin_items.map(step => {
+            const product = step.status === 'producing' ? step.item_name : null;
+            const positions = product
+                ? members.filter(member => member.facility === step.facility
+                    && (member.crop === product || member.jobs?.some(job => job.item === product)))
+                : [];
+            const places = positions.map(member => {
+                const plot = homelandPlots().find(p =>
+                    member.x + member.w / 2 >= p.x && member.x + member.w / 2 < p.x + p.w
+                    && member.y + member.h / 2 >= p.y && member.y + member.h / 2 < p.y + p.h);
+                return plot
+                    ? `${translate(`Plot ${plot.number}`)} (x ${member.x}, y ${member.y})`
+                    : `x ${member.x}, y ${member.y}`;
+            });
+            const rate = step.status === 'producing' && step.cycle_time > 0
+                ? ((step.busy_units ?? step.facility_count) / step.cycle_time * 3600).toLocaleString(currentLocale(), { maximumFractionDigits: 4 })
+                : '';
+            return [
+                translate(step.facility),
+                product ? translate(prettyItem(product)) : '',
+                step.facility_count,
+                rate,
+                step.environment ? translate(step.environment) : '',
+                [...new Set(places)].join('; '),
+                translate(statusLabels[step.status] || step.status),
+            ];
+        }),
+    ];
+    const file = new Blob(['\uFEFF', rows.map(row => row.map(csvCell).join(',')).join('\r\n')], {
+        type: 'text/csv;charset=utf-8',
+    });
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'aniimax-production-plan.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function drawLayout(drawn) {
@@ -1232,12 +1286,15 @@ function drawLayout(drawn) {
 
 function renderHomelandLayout(plan) {
     const card = document.getElementById('layout-card');
+    const productionButton = document.getElementById('production-download');
     if (!plan?.success || !lastPlanInput) {
         card.style.display = 'none';
+        productionButton.disabled = true;
         return;
     }
     const runId = ++layoutRunId;
     lastLayout = null;
+    productionButton.disabled = true;
     stopLayoutSim();
     setStep('layout', 'start');
     card.style.display = 'block';
@@ -1272,6 +1329,7 @@ function renderHomelandLayout(plan) {
             : 'Nothing in this plan is carried to the Storage Unit.'}${notes ? ` ${notes}` : ''}`;
         lastLayout = { layout, homeLevel };
         drawLayout(lastLayout);
+        productionButton.disabled = false;
         setStep('layout', 'done');
     };
     layoutWorker.onerror = (event) => {
@@ -1291,6 +1349,7 @@ function stopLayout() {
     layoutWorker?.terminate();
     layoutWorker = null;
     lastLayout = null;
+    document.getElementById('production-download').disabled = true;
 }
 
 // Whether the layout shows the whole homeland rather than just what's placed; the player's toggle.
