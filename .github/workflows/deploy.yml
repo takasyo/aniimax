@@ -27,7 +27,9 @@ jobs:
           target: wasm32-unknown-unknown
 
       - name: Install wasm-pack
-        run: cargo install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
 
       - name: Build WASM
         run: wasm-pack build --target web --out-dir web/pkg
