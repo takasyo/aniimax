@@ -264,7 +264,7 @@ export const FACILITY_FOOTPRINTS = {
     'Simmering Pot': [1.5, 1.5],
     'Phonolfactory Table': [3.5, 3.5],
     'Bouncy Brew Keg': [3, 3],
-    'Blazing Stove': [2.5, 1.75],
+    'Blazing Stove': [2.5, 2],
     'Pickling Jar': [2.5, 2],
     'Jukebox Dryer': [2.5, 2.5],
     'Joy Wheel Loom': [4, 4],
